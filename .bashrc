@@ -187,10 +187,6 @@ codi() {
 # Shortcuts for specific folders
 #--------------------------------
 
-alias cd-faculdade='cd ~/ownCloud/Documents/Faculdade'
-alias cd-faculdade-c='cd ~/ownCloud/Documents/Faculdade/1º\ ano/4º\ Bim/'
-
-
 # Exec actions
 alias generate-tags='ctags -R -f ./.git/tags .'
 
