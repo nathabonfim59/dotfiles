@@ -42,30 +42,25 @@ Plug 'wakatime/vim-wakatime'
 " Adds autocompletion
 Plug 'neoclide/coc.nvim', {'branch': 'release'}
 
-Plug 'edkolev/tmuxline.vim'
-
 call plug#end()
 
 " Vim options
 set tabstop=4
-set shiftwidth=4 
-retab " All files should match the current settings
-set noexpandtab " NOT Transforms tabs into spaces
+set shiftwidth=4
+set expandtab
 set number
 set autoindent
 syntax on
 set wildmenu " Enable fuzzy seach
 "set autochdir! " Enable autojoin in the current directory
-set clipboard=unnamedplus " Clipboard from vim also affect system clipboard
-set conceallevel=2 " Shows the formating only when in the current line
-set colorcolumn=80 " A rule showing a limit at 80 chars
+set clipboard+=unnamedplus " Clipboard from vim also affect system clipboard
+"set conceallevel=2 " Shows the formating only when in the current line
+set nofoldenable
+
 set mouse=a " Habilitar seleção com o mouse
 set noshowmode
 colorscheme onedark
 set laststatus=2
-set fileencodings=utf-8
-let mapleader=","
-set nofoldenable " Disable folding in markdown files
 
 let g:lightline = {
 	\ 'active': {
@@ -143,7 +138,7 @@ inoremap <expr> <Tab> pumvisible() ? "\<C-n>" : "\<Tab>"
 inoremap <expr> <S-Tab> pumvisible() ? "\<C-p>" : "\<S-Tab>"
 
 " Open coc-explorer with the same shortcut <Ctrl + Alt + b>
-noremap <C-b> :CocCommand explorer<CR>
+nmap <C-M-b> :CocCommand explorer<CR>
 
 " CoC explorer config 
 let g:coc_explorer_global_presets = {
