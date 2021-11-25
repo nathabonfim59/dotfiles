@@ -1,0 +1,12 @@
+# Ignore everything
+*
+
+# Include bashrc
+!.bashrc
+
+# Tmux configuration
+!.tmux/
+!.tmux.conf
+
+# VIM configuration
+!.config/nvim/
