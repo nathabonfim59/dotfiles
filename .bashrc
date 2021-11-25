@@ -28,7 +28,7 @@ shopt -s checkwinsize
 #shopt -s globstar
 
 # make less more friendly for non-text input files, see lesspipe(1)
-#[ -x /usr/bin/lesspipe ] && eval "$(SHELL=/bin/sh lesspipe)"
+[ -x /usr/bin/lesspipe ] && eval "$(SHELL=/bin/sh lesspipe)"
 
 # set variable identifying the chroot you work in (used in the prompt below)
 if [ -z "${debian_chroot:-}" ] && [ -r /etc/debian_chroot ]; then
@@ -59,7 +59,7 @@ fi
 if [ "$color_prompt" = yes ]; then
     PS1='${debian_chroot:+($debian_chroot)}\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\W\[\033[00m\]\$ '
 else
-    PS1='${debian_chroot:+($debian_chroot)}\u@\h:\w\$ '
+    PS1='${debian_chroot:+($debian_chroot)}\u@\h:\W\$ '
 fi
 unset color_prompt force_color_prompt
 
@@ -79,18 +79,22 @@ if [ -x /usr/bin/dircolors ]; then
     #alias dir='dir --color=auto'
     #alias vdir='vdir --color=auto'
 
-    #alias grep='grep --color=auto'
-    #alias fgrep='fgrep --color=auto'
-    #alias egrep='egrep --color=auto'
+    alias grep='grep --color=auto'
+    alias fgrep='fgrep --color=auto'
+    alias egrep='egrep --color=auto'
 fi
 
 # colored GCC warnings and errors
 #export GCC_COLORS='error=01;31:warning=01;35:note=01;36:caret=01;32:locus=01:quote=01'
 
 # some more ls aliases
-#alias ll='ls -l'
-#alias la='ls -A'
-#alias l='ls -CF'
+alias ll='ls -alF'
+alias la='ls -A'
+alias l='ls -CF'
+
+# Add an "alert" alias for long running commands.  Use like so:
+#   sleep 10; alert
+alias alert='notify-send --urgency=low -i "$([ $? = 0 ] && echo terminal || echo error)" "$(history|tail -n1|sed -e '\''s/^\s*[0-9]\+\s*//;s/[;&|]\s*alert$//'\'')"'
 
 # Alias definitions.
 # You may want to put all your additions into a separate file like
@@ -111,83 +115,25 @@ if ! shopt -oq posix; then
     . /etc/bash_completion
   fi
 fi
-# Set LS_COLORS environment by Deepin
-if [[ ("$TERM" = *256color || "$TERM" = screen* || "$TERM" = xterm* ) && -f /etc/lscolor-256color ]]; then
-    eval $(dircolors -b /etc/lscolor-256color)
-else
-    eval $(dircolors)
+. "$HOME/.cargo/env"
+
+function _update_ps1() {
+    PS1="$($HOME/.local/bin/powerline-go -hostname-only-if-ssh -cwd-max-depth 1 -newline -error $? -jobs $(jobs -p | wc -l))"
+
+    # Uncomment the following line to automatically clear errors after showing
+    # them once. This not only clears the error for powerline-go, but also for
+    # everything else you run in that shell. Don't enable this if you're not
+    # sure this is what you want.
+
+    #set "?"
+}
+
+if [ "$TERM" != "linux" ] && [ -f "$HOME/.local/bin/powerline-go" ]; then
+    PROMPT_COMMAND="_update_ps1; $PROMPT_COMMAND"
 fi
 
-PATH="/home/nathabonfim59/perl5/bin\:$HOME/.config/composer/vendor/bin${PATH:+:${PATH}}"; export PATH;
-PERL5LIB="/home/nathabonfim59/perl5/lib/perl5${PERL5LIB:+:${PERL5LIB}}"; export PERL5LIB;
-PERL_LOCAL_LIB_ROOT="/home/nathabonfim59/perl5${PERL_LOCAL_LIB_ROOT:+:${PERL_LOCAL_LIB_ROOT}}"; export PERL_LOCAL_LIB_ROOT;
-PERL_MB_OPT="--install_base \"/home/nathabonfim59/perl5\""; export PERL_MB_OPT;
-PERL_MM_OPT="INSTALL_BASE=/home/nathabonfim59/perl5"; export PERL_MM_OPT;
-
-
-[ -f ~/.fzf.bash ] && source ~/.fzf.bash
-
-# Pretty print the man pages
-export LESS_TERMCAP_mb=$'\e[1;32m'
-export LESS_TERMCAP_md=$'\e[1;32m'
-export LESS_TERMCAP_me=$'\e[0m'
-export LESS_TERMCAP_se=$'\e[0m'
-export LESS_TERMCAP_so=$'\e[01;33m'
-export LESS_TERMCAP_ue=$'\e[0m'
-export LESS_TERMCAP_us=$'\e[1;4;31m'
-
-# Add local binaries to $PATH
 export PATH=$PATH:~/.local/bin
 
-# Adds rust binaries to $PATH
-alias cargo='~/.cargo/bin/cargo' # Package manager for Rust
-export PATH=$PATH:~/.cargo/bin
-
-# Adds the composer binaries to $PATH
-export PATH="$HOME/.config/composer/vendor/bin:$PATH"
-
-# Adds the nodejs packages home
-NPM_PACKAGES="$HOME/.npm-packages" # NPM packages in homedir
-PATH="$NPM_PACKAGES/bin:$PATH" # Tell our environment about user-installed node tools
-unset MANPATH  # delete if you already modified MANPATH elsewhere in your configuration
-MANPATH="$NPM_PACKAGES/share/man:$(manpath)"
-NODE_PATH="$NPM_PACKAGES/lib/node_modules:$NODE_PATH" # Tell Node about these packages
-
-
-# Add go to $PATH
-export PATH=$PATH:/usr/local/go/bin
-export GOPATH=$HOME/go
-export PATH=$PATH:$GOROOT/bin:$GOPATH/bin
-
-# Add GO binaries
-function _update_ps1() {
-	PS1="$($GOPATH/bin/powerline-go -hostname-only-if-ssh -cwd-max-depth 1 -newline -error $?)"
-}
-
-if [ "$TERM" != "linux" ] && [ -f "$GOPATH/bin/powerline-go" ]; then
-	PROMPT_COMMAND="_update_ps1; $PROMPT_COMMAND"
-fi
-
-# Cofigurations for codi-vim (https://vimawesome.com/plugin/codi-vim)
-# Usage: codi [filetype] [filename]
-codi() {
-  local syntax="${1:-python}"
-  shift
-  vim -c \
-    "let g:startify_disable_at_vimenter = 1 |\
-    set bt=nofile ls=0 noru nonu nornu |\
-    hi ColorColumn ctermbg=NONE |\
-    hi VertSplit ctermbg=NONE |\
-    hi NonText ctermfg=0 |\
-    Codi $syntax" "$@"
-}
-
-
-#--------------------------------
-# Shortcuts for specific folders
-#--------------------------------
-
-# Exec actions
-alias generate-tags='ctags -R -f ./.git/tags .'
-
-alias fcc-radio='cd /tmp && wget https://coderadio-admin.freecodecamp.org/radio/8010/radio.mp3?1606533122 -O - | mplayer -cache 512 -'
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
