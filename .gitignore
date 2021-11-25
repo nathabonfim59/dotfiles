@@ -10,3 +10,6 @@
 
 # VIM configuration
 !.config/nvim/
+
+# Kitty terminal configs
+!.config/kitty/
