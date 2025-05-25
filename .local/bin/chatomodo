@@ -1,0 +1,15 @@
+#!/bin/bash
+
+# Description
+#
+# Opens a new bash session with a predefined alias for continuing the current
+# modality conversation using mods (https://github.com/charmbracelet/mods)
+#
+# Extracts the conversation ID automatically and sets
+# up the environment to seamlessly resume the same chat context.
+
+CHAT_ID=$(mods "<char_start>" --raw 2>&1 >/dev/null | grep -o "Conversation saved: \s*[a-z0-9]*" | awk "{print \$3}")
+
+export CHAT_ID=$CHAT_ID
+
+exec bash -c "alias mods='mods -C $CHAT_ID'; exec bash"

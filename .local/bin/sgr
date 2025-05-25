@@ -1,0 +1,84 @@
+#!/usr/bin/env bash
+
+# Description
+#
+# Uses AI to suggest terminal commands based on your request and recent tmux output.
+# Captures your terminal history through tmux, sends it to an AI (mods CLI), and 
+# generates command suggestions that you can immediately execute.
+#
+# Note: Must be executed within a tmux session.
+
+# Get the current pane content
+get_pane_content() {
+    local lines=$1
+    tmux capture-pane -p -S -"$lines"
+}
+
+# Main function
+main() {
+    # Check for dependencies
+    if ! command -v gum &> /dev/null; then
+        tmux display-message "Error: gum is not installed"
+        exit 1
+    fi
+    if ! command -v mods &> /dev/null; then
+        tmux display-message "Error: mods is not installed"
+        exit 1
+    fi
+
+    # Ask for context lines using gum
+    local default_options=$(gum choose "0" "10" "20" "50" "100" "200" "Custom" --header="How many lines of context to include?")
+    if [ -z "$default_options" ]; then
+        exit 0
+    fi
+
+    local context_lines="$default_options"
+    if [ "$default_options" = "Custom" ]; then
+        context_lines=$(gum input --placeholder "Enter number of lines")
+        if [ -z "$context_lines" ]; then
+            exit 0
+        fi
+        if ! [[ "$context_lines" =~ ^[0-9]+$ ]]; then
+            tmux display-message "Error: Please enter a valid number"
+            exit 1
+        fi
+    fi
+
+    # Get current pane content
+    local context=$(get_pane_content "$context_lines")
+
+    # Get user input: either from params or gum
+    if [ $# -gt 0 ]; then
+        user_input="$*"
+    else
+        user_input=$(gum input --placeholder "What command do you want to run?")
+        if [ -z "$user_input" ]; then
+            exit 0
+        fi
+    fi
+
+    # Prepare the prompt for mods
+    local prompt="Given the following terminal context and user request, suggest an appropriate command:
+
+Terminal Context:
+$context
+
+User Request: $user_input
+
+Provide only the command, no explanation."
+
+    # Get AI suggestion using mods
+    local suggestion=$(echo "$prompt" | mods --quiet --format-as "text")
+
+    # Show the command
+    echo
+    echo "$suggestion"
+
+    # Show the suggestion with gum and ask for confirmation
+    if gum confirm "Use this command?"; then
+        # Send the command to tmux
+        tmux send-keys "$suggestion"
+    fi
+}
+
+main
