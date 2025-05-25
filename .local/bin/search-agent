@@ -1,0 +1,179 @@
+#!/bin/bash
+
+# Description
+#
+# A smart search assistant that uses AI to find answers to your questions.
+# Searches the web, analyzes results, and provides concise answers with follow-up options.
+# Can operate in autonomous navigation mode to explore multiple links for better answers.
+#
+# Requirements:
+# - gum (https://github.com/charmbracelet/gum) - A tool for glamorous shell scripts
+# - mods (https://github.com/charmbracelet/mods) - AI tools for the command line
+# - md-fetch (https://github.com/nathabonfim59/md-fetch - For fetching web content)
+# - python3
+#
+# Usage: search-agent [--agent] [--max-navigations N] [-q] [question]
+# Options:
+#   --agent            Enable autonomous navigation mode
+#   --max-navigations  Set maximum number of autonomous link navigations (default: 3)
+#   -q                 Quiet mode (non-interactive)
+
+# Function to URL encode strings
+urlencode() {
+    python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1]))' "$1"
+}
+
+# Function to perform search and get results
+perform_search() {
+    local query="$1"
+    local encoded_query=$(urlencode "$query")
+    local url="https://duck.com/?q=$encoded_query"
+    gum spin --spinner dot --title "Searching..." -- md-fetch "$url"
+}
+
+# Function to navigate to specific link
+navigate_link() {
+    local url="$1"
+    gum spin --spinner dot --title "Fetching content..." -- md-fetch "$url"
+}
+
+# Function to process with LLM
+process_with_llm() {
+    local prompt="$1"
+    local context="$2"
+    local verbose=${3:-"-q"}
+    gum spin --spinner dot --title "Processing..." -- \
+        echo "$prompt" | mods $verbose -C "$context"
+}
+
+# Print styled headers
+print_header() {
+    if [ "$QUIET_MODE" != "true" ]; then
+        gum style --foreground 212 --border double --align center --width 50 --margin "1 2" "$1"
+    fi
+}
+
+# Function to handle follow-up options
+handle_followup() {
+    local choice=$(gum choose "Navigate to a link" "Ask a follow-up question" "Ask a new question" "Exit")
+    case "$choice" in
+        "Navigate to a link") return 2 ;;
+        "Ask a follow-up question") return 0 ;;
+        "Ask a new question") return 1 ;;
+        "Exit") exit 0 ;;
+    esac
+}
+
+# Function to autonomously navigate and find answer
+autonomous_navigation() {
+    local content="$1"
+    local question="$2"
+    local nav_count=0
+
+    while [ $nav_count -lt $MAX_NAVIGATIONS ]; do
+        local decision=$(process_with_llm "$question" "Based on this content, decide if you need to navigate to a link for more information or can answer the question. If you need to navigate, respond with [NAVIGATE] and the number of the most relevant link. If you can answer, respond with [ANSWER] followed by your answer. Content: $content")
+
+        if [[ $decision == \[NAVIGATE\]* ]]; then
+            local link_number=$(echo "$decision" | grep -o '[0-9]\+' | head -1)
+            local link_selection=$(process_with_llm "Extract and number all URLs from these results:" "$content")
+            local selected_url=$(echo "$link_selection" | grep "^$link_number\." | sed -E 's/^[0-9]+\.\s*//' | grep -o 'http[s]\?://[^[:space:]]*')
+
+            if [ ! -z "$selected_url" ]; then
+                print_header "Autonomous Navigation $((nav_count + 1))/$MAX_NAVIGATIONS"
+                content=$(navigate_link "$selected_url")
+                ((nav_count++))
+            else
+                break
+            fi
+        else
+            echo "$decision" | sed 's/\[ANSWER\]//'
+            return
+        fi
+    done
+    
+    process_with_llm "$question" "Provide the best answer based on all information gathered: $content"
+}
+
+# Main logic
+QUIET_MODE="false"
+AGENT_MODE="false"
+MAX_NAVIGATIONS=3
+
+# Parse command line arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -q) QUIET_MODE="true"; shift ;;
+        --agent) AGENT_MODE="true"; shift ;;
+        --max-navigations) MAX_NAVIGATIONS="$2"; shift 2 ;;
+        *) break ;;
+    esac
+done
+
+# Initialize conversation
+mods -q 'Return just "Smart Search Assistant" and nothing else' > /dev/null
+
+while true; do
+    print_header "Smart Search Assistant"
+    
+    if [ "$QUIET_MODE" = "true" ]; then
+        question="$*"
+    else
+        question=$(gum input --placeholder "Enter your question (or 'exit' to quit)" --width 80)
+    fi
+    
+    [ "$question" = "exit" ] && exit 0
+    [ -z "$question" ] && continue
+    
+    print_header "Generating Search Query"
+    search_query=$(process_with_llm "$question" "Rewrite this as a concise search query for finding relevant information:")
+    
+    print_header "Searching"
+    search_results=$(perform_search "$search_query")
+    last_results="$search_results"
+    
+    if [ "$AGENT_MODE" = "true" ]; then
+        print_header "Autonomous Navigation Mode"
+        response=$(autonomous_navigation "$search_results" "$question")
+    else
+        print_header "Analyzing Results"
+        response=$(process_with_llm "$question" "Based on this search result and the original question, please provide an answer. If the information is not sufficient, you can request another specific search. Include [NEED_SEARCH] at the start of your response if you need another search, followed by the new search query on a new line. Search results: $search_results")
+        
+        if [[ $response == \[NEED_SEARCH\]* ]]; then
+            new_query=$(echo "$response" | sed -n '2p')
+            print_header "Performing Additional Search"
+            additional_results=$(perform_search "$new_query")
+            last_results="$additional_results"
+            
+            print_header "Final Analysis"
+            response=$(process_with_llm "$question" "Now with additional information, please provide a complete answer. Original search: $search_results Additional search: $additional_results")
+        fi
+    fi
+    
+    print_header "Answer"
+    echo "$response" | gum format
+    
+    echo
+    
+    if [ "$QUIET_MODE" = "true" ]; then
+        exit 0
+    else
+        handle_followup
+        retval=$?
+        if [ $retval -eq 2 ]; then
+            print_header "Select Link"
+            link_selection=$(process_with_llm "Extract and number all URLs from these results, then wait for user selection:" "$last_results")
+            echo "$link_selection" | gum format
+            link_number=$(gum input --placeholder "Enter the number of the link you want to visit")
+            selected_url=$(echo "$link_selection" | grep "^$link_number\." | sed -E 's/^[0-9]+\.\s*//' | grep -o 'http[s]\?://[^[:space:]]*')
+            
+            if [ ! -z "$selected_url" ]; then
+                print_header "Navigating to Link"
+                link_content=$(navigate_link "$selected_url")
+                print_header "Link Content"
+                echo "$link_content" | gum format
+            fi
+        elif [ $retval -eq 1 ]; then
+            continue
+        fi
+    fi
+done
