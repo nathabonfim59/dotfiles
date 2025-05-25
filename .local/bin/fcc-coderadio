@@ -1,0 +1,15 @@
+#!/bin/bash
+
+# Description
+#
+# A command line utility for playing FreeCodeCamp's CodeRadio stream.
+# Simply launches the live coding music stream in mpv (without video).
+# Runs in a detached tmux session named "Music" for easy background playback.
+#
+# Requirements:
+# - tmux - Terminal multiplexer
+# - mpv - Media player
+#
+# Usage: fcc-coderadio
+
+tmux new-session -d -s "Music" "mpv --no-video https://coderadio-admin-v2.freecodecamp.org/listen/coderadio/radio.mp3"
