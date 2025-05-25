@@ -1,0 +1,101 @@
+# Integrating Multiple GitHub Accounts with SSH Keys and Lazygit
+#
+# This configuration allows you to use multiple GitHub accounts simultaneously
+# by setting up different SSH identities. This is particularly useful when you:
+# - Have personal and work GitHub accounts
+# - Contribute to different organizations with different credentials
+# - Need to maintain separate access credentials for security purposes
+#
+# TIP: use `gitid` (https://github.com/nathabonfim59/gitid) to easily swtich
+#      betwen git identities with a single command (commit author/email).
+#
+#==================
+#  Usage
+#------------------
+# Step 1: Generate SSH keys for each account (if you haven't already)
+#   $ ssh-keygen -t ed25519 -C "work@example.com" -f ~/.ssh/id_work
+#   $ ssh-keygen -t ed25519 -C "personal@example.com" -f ~/.ssh/id_personal
+#
+# Step 2: Add the SSH keys to your GitHub accounts
+#   Upload each public key to the corresponding GitHub account
+#
+# Step 3: Create SSH config entries in ~/.ssh/config:
+#
+#   Host github-work
+#       HostName github.com
+#       User git
+#       IdentityFile ~/.ssh/id_work
+#       IdentitiesOnly yes
+#
+#   Host github-personal
+#       HostName github.com 
+#       User git
+#       IdentityFile ~/.ssh/id_personal
+#       IdentitiesOnly yes
+#
+# Step 4: Clone repositories using the custom Host instead of github.com
+#   Instead of: git clone git@github.com:organization/repo.git
+#   Use:        git clone git@github-work:organization/repo.git
+#
+# Step 5: For existing repos, update the remote URL
+#   $ git remote set-url origin git@github-personal:username/repo.git
+#
+# The "services" section below maps these SSH identities to GitHub accounts
+# when using Lazygit.
+#
+services:
+  'nathabonfim59': 'github:github.com'
+
+gui:
+  authorColors:
+   'Sample Commiter': '#0087af'
+
+git:
+  paging:
+    colorArg: always
+    pager: delta --paging=never --line-numbers --hyperlinks --hyperlinks-file-link-format="lazygit-edit://{path}:{line}"
+
+customCommands:
+   - key: '<c-g>'
+     context: 'global'
+     description: 'AI Commit Message'
+     loadingText: 'Generating commit message'
+     prompts:
+       - type: 'menu'
+         title: 'AI Commit Options'
+         key: 'action'
+         options:
+           - name: 'Generate'
+             description: 'Generate new commit message'
+             value: 'generate'
+           - name: 'Commit'
+             description: 'Use current message'
+             value: 'commit'
+           - name: 'View'
+             description: 'View current message'
+             value: 'view'
+           - name: 'Clear'
+             description: 'Remove current message'
+             value: 'clear'
+
+     command: |
+       {{if eq .Form.action "generate"}}
+         gen-commit-lazygit | tee /tmp/lazygit-commit-msg
+       {{else if eq .Form.action "view"}}
+         test -f /tmp/lazygit-commit-msg && cat /tmp/lazygit-commit-msg || echo "No commit message generated yet"
+       {{else if eq .Form.action "clear"}}
+         test -f /tmp/lazygit-commit-msg && rm /tmp/lazygit-commit-msg || echo "No commit message file exists"
+       {{else}}
+         git commit -m "$(cat /tmp/lazygit-commit-msg)" && rm /tmp/lazygit-commit-msg
+       {{end}}
+     showOutput: true
+
+   - key: '<c-N>'
+     context: 'global'
+     description: 'Refine commit message'
+     prompts:
+       - type: 'input'
+         title: 'Enter feedback for refinement'
+         key: 'feedback'
+     command: "cat /tmp/lazygit-commit-msg | mods -q -C \"feedback: {{.Form.feedback}}\" | tee /tmp/lazygit-commit-msg"
+     showOutput: true
